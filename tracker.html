@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <title>AI 动作追踪器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08080c">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box }
+    body {
+      background: #08080c;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    /* Loading */
+    #loading {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #08080c;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(255,255,255,.08);
+      border-top-color: #00ffc8;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg) } }
+    #loading-text { margin-top: 14px; font-size: 13px; color: #555 }
+
+    /* Container */
+    #container { position: fixed; inset: 0; overflow: hidden; background: #08080c }
+    #video {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; transform: scaleX(-1); z-index: 1;
+    }
+    #overlay {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      transform: scaleX(-1); z-index: 2; pointer-events: none;
+    }
+
+    /* Title */
+    #title {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      font-size: 15px; font-weight: 600; letter-spacing: .5px;
+      color: rgba(255,255,255,.65);
+    }
+    #title span { color: #00ffc8 }
+
+    /* Panel */
+    #panel {
+      position: fixed; top: 16px; right: 16px; z-index: 10;
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 14px;
+      background: rgba(12,12,20,.82);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      min-width: 130px;
+    }
+    #fps {
+      font-size: 11px; color: #444; font-family: monospace;
+      text-align: center; padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .tog {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 8px;
+      background: rgba(255,255,255,.02);
+      color: #555; font-size: 12px;
+      cursor: pointer; transition: all .2s; user-select: none;
+    }
+    .tog:hover { background: rgba(255,255,255,.06) }
+    .tog.on { color: #eee; border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.05) }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      opacity: .25; transition: opacity .2s;
+    }
+    .tog.on .dot { opacity: 1; box-shadow: 0 0 6px }
+    .dot.f { background: #00ffc8; color: #00ffc8 }
+    .dot.h { background: #ff6644; color: #ff6644 }
+    .dot.p { background: #ffdd00; color: #ffdd00 }
+
+    /* Audio meter */
+    .meter { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px }
+    .meter-track {
+      flex: 1; height: 3px;
+      background: rgba(255,255,255,.05);
+      border-radius: 2px; overflow: hidden;
+    }
+    .meter-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #00ffc8, #00ff66);
+      border-radius: 2px; transition: width .08s;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loading-text">初始化中…</p>
+  </div>
+
+  <div id="container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="title"><span>AI</span> Motion Tracker</div>
+
+  <div id="panel">
+    <div id="fps">-- FPS</div>
+    <button class="tog on" id="toggle-face"><span class="dot f"></span>面部追踪</button>
+    <button class="tog on" id="toggle-hands"><span class="dot h"></span>手部追踪</button>
+    <button class="tog on" id="toggle-pose"><span class="dot p"></span>身体追踪</button>
+    <div class="meter">
+      <span>🎤</span>
+      <div class="meter-track"><div class="meter-bar" id="audio-bar"></div></div>
+    </div>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.162.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="tracker.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,11 @@
+The project aims to create an interactive AI-powered fitness visualization experience that helps users better understand their current body condition and visualize potential physical changes. Many people who are trying to lose weight or improve their fitness often struggle to clearly imagine how their body might change over time. Traditional metrics such as weight or BMI numbers are abstract and difficult for users to intuitively relate to their physical appearance.
+
+This project proposes an AI-based interactive “Body Scanner” interface that combines user-input health data with real-time camera-based body detection to generate a visual representation of the user’s body shape. Users will first input basic information such as height, weight, age, and gender. The system will then estimate body metrics such as BMI and approximate body fat percentage.
+
+Using the device camera, the system will detect the user’s body posture and silhouette through pose detection technology. A digital outline or mesh representation of the body will be generated and overlaid on the screen, allowing users to see a simplified model of their current body structure.
+
+The key interaction of the project is a “future body simulation” feature. Users can enter a target weight or body fat percentage, and the system will generate a visual transformation of their body shape based on the current scan and the desired goal. Through smooth morphing animations, users will be able to compare their current body shape with a predicted future physique.
+
+The purpose of this project is not medical accuracy but experiential visualization. The focus is on creating an engaging, interactive, and visually compelling interface that demonstrates how AI, computer vision, and motion-based interaction can be applied in a fitness or wellness context.
+
+The final experience should feel like a futuristic AI fitness mirror where users can explore their body data, visualize potential changes, and interact with a responsive digital representation of themselves.
