@@ -27,6 +27,15 @@ let lastVT = -1;
 const opts = { face: true, hands: true, pose: true };
 const latest = { face: null, leftHand: null, rightHand: null, pose: null };
 
+// Simple FPS measurement for debug HUD
+let fpsLastTime = 0;
+let fpsFrames = 0;
+
+// 垂直校正：WebGL 原点在左下，MediaPipe 在左上，需翻转 y
+// 同时微调 offset 以匹配视频显示
+const OVERLAY_Y_FLIP = true;
+const OVERLAY_Y_OFFSET = 0.05;
+
 export function setOptions(o) { Object.assign(opts, o); }
 export function getLatestLandmarks() { return latest; }
 
@@ -50,6 +59,7 @@ export async function initModels(onStatus) {
   handL = await mp.HandLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: MODELS.hand, delegate: 'GPU' },
     runningMode: 'VIDEO', numHands: 2,
+    minHandDetectionConfidence: 0.3,
   });
 
   onStatus?.('載入身體追蹤模型…');
@@ -130,14 +140,17 @@ function fit() {
 
   const videoAspect = video.videoWidth / video.videoHeight;
   const viewAspect = vw / vh;
+  /* 与 object-fit: contain 一致；OVERLAY_Y_FLIP 时需 top>bottom 以匹配 WebGL 坐标系 */
   if (viewAspect > videoAspect) {
     const crop = (1 - videoAspect / viewAspect) / 2;
-    cam.left = 0; cam.right = 1;
-    cam.top = crop; cam.bottom = 1 - crop;
+    cam.left = crop; cam.right = 1 - crop;
+    cam.top = OVERLAY_Y_FLIP ? 1 : 0;
+    cam.bottom = OVERLAY_Y_FLIP ? 0 : 1;
   } else {
     const crop = (1 - viewAspect / videoAspect) / 2;
-    cam.left = crop; cam.right = 1 - crop;
-    cam.top = 0; cam.bottom = 1;
+    cam.left = 0; cam.right = 1;
+    cam.top = OVERLAY_Y_FLIP ? 1 - crop : crop;
+    cam.bottom = OVERLAY_Y_FLIP ? crop : 1 - crop;
   }
   cam.updateProjectionMatrix();
 }
@@ -145,11 +158,25 @@ function fit() {
 function tick() {
   animId = requestAnimationFrame(tick);
   if (!video || video.currentTime === lastVT) {
+    updateDebugHUD();
     renderer.render(scene, cam);
     return;
   }
   lastVT = video.currentTime;
   const ts = performance.now();
+
+  // FPS debug
+  fpsFrames++;
+  if (!fpsLastTime) fpsLastTime = ts;
+  const dt = ts - fpsLastTime;
+  if (dt >= 500) { // update roughly every 0.5s
+    const fps = (fpsFrames * 1000) / dt;
+    fpsFrames = 0;
+    fpsLastTime = ts;
+    if (window.DebugHUD && typeof window.DebugHUD.setFPS === 'function') {
+      window.DebugHUD.setFPS(fps);
+    }
+  }
 
   if (opts.face && faceL) {
     const r = faceL.detectForVideo(video, ts);
@@ -178,7 +205,55 @@ function tick() {
     setLM(poseO, lm);
   } else { clr(poseO); latest.pose = null; }
 
+  updateDebugHUD();
   renderer.render(scene, cam);
+}
+
+function updateDebugHUD() {
+  if (!window.DebugHUD) return;
+  if (typeof window.DebugHUD.setTracking === 'function') {
+    window.DebugHUD.setTracking({
+      face: !!latest.face,
+      leftHand: !!latest.leftHand,
+      rightHand: !!latest.rightHand,
+      pose: !!latest.pose,
+    });
+  }
+  if (typeof window.DebugHUD.setGesture === 'function') {
+    const gestures = [];
+    [latest.leftHand, latest.rightHand].forEach((lm, i) => {
+      if (!lm?.length) return;
+      const g = inferHandGesture(lm);
+      if (g) gestures.push((i === 0 ? 'L:' : 'R:') + g);
+    });
+    window.DebugHUD.setGesture(gestures.length ? gestures.join(' · ') : null);
+  }
+}
+
+function inferHandGesture(lm) {
+  if (!lm || lm.length < 21) return null;
+  const dist = (a, b) => Math.hypot(lm[a].x - lm[b].x, lm[a].y - lm[b].y);
+  const tip = (i) => lm[i];
+  const mcp = (i) => lm[i - 3]; // 8->5, 12->9, 16->13, 20->17
+  const extended = (tipIdx) => tip(tipIdx).y < mcp(tipIdx).y - 0.02;
+  const curled = (tipIdx) => tip(tipIdx).y > mcp(tipIdx).y + 0.02;
+
+  // Thumbs up: thumb tip above thumb IP
+  if (tip(4).y < tip(3).y - 0.03) return '👍 大拇指 Thumbs up';
+  // Peace: index & middle extended, others curled
+  if (extended(8) && extended(12) && curled(16) && curled(20)) return '✌️ 剪刀手 Peace';
+  // Heart/比心: thumb tip + index tip close (放宽阈值便于识别)
+  if (dist(4, 8) < 0.15) return '❤️ 比心 Heart';
+  // Fist: all fingers curled
+  if ([8, 12, 16, 20].every(curled)) return '✊ 握拳 Fist';
+  // Open palm: all extended
+  if ([8, 12, 16, 20].every(extended)) return '🖐️ 张开 Open palm';
+  return null;
+}
+
+function mapY(y) {
+  const flipped = OVERLAY_Y_FLIP ? 1 - y : y;
+  return flipped + OVERLAY_Y_OFFSET;
 }
 
 function setLM(o, lm) {
@@ -186,7 +261,7 @@ function setLM(o, lm) {
   const pos = o.pts.geometry.attributes.position.array;
   for (let i = 0; i < lm.length; i++) {
     pos[i * 3]     = lm[i].x;
-    pos[i * 3 + 1] = lm[i].y;
+    pos[i * 3 + 1] = mapY(lm[i].y);
     pos[i * 3 + 2] = -(lm[i].z || 0);
   }
   o.pts.geometry.attributes.position.needsUpdate = true;
@@ -196,8 +271,8 @@ function setLM(o, lm) {
     let ci = 0;
     for (const [a, b] of o.conns) {
       if (a < lm.length && b < lm.length) {
-        lp[ci++] = lm[a].x; lp[ci++] = lm[a].y; lp[ci++] = -(lm[a].z || 0);
-        lp[ci++] = lm[b].x; lp[ci++] = lm[b].y; lp[ci++] = -(lm[b].z || 0);
+        lp[ci++] = lm[a].x; lp[ci++] = mapY(lm[a].y); lp[ci++] = -(lm[a].z || 0);
+        lp[ci++] = lm[b].x; lp[ci++] = mapY(lm[b].y); lp[ci++] = -(lm[b].z || 0);
       }
     }
     o.lines.geometry.attributes.position.needsUpdate = true;

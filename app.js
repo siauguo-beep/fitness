@@ -201,6 +201,127 @@ const DeviceFeatures = {
   },
 };
 
+// Debug mode: only when URL has ?debug=1 or ?debug=true (default: off for clean UX)
+// Usage: http://localhost:8888/index.html?debug=1
+const DEBUG_MODE = /[?&]debug=(1|true)/i.test(location.search);
+
+// Lightweight on-screen debug HUD (for development / tuning)
+const DebugHUD = (() => {
+  if (!DEBUG_MODE) {
+    return { setFPS() {}, setTracking() {}, setGesture() {}, log() {} };
+  }
+
+  // Container
+  const wrap = document.createElement('div');
+  wrap.className = 'debug-hud';
+  wrap.innerHTML = `
+    <div class="debug-hud-header">
+      <span class="debug-hud-title">Debug Panel</span>
+      <span class="debug-hud-sub">For tuning only</span>
+    </div>
+    <div class="debug-hud-row">
+      <span class="debug-label">FPS</span>
+      <span class="debug-value debug-fps-value" data-debug-fps>—</span>
+    </div>
+    <div class="debug-hud-row debug-hud-row--control">
+      <span class="debug-label">Target</span>
+      <div class="debug-control">
+        <input type="range" min="5" max="60" step="1" value="10" class="debug-fps-slider" />
+        <span class="debug-control-value" data-debug-fps-target>10 fps</span>
+      </div>
+    </div>
+    <div class="debug-hud-row">
+      <span class="debug-label">Tracking</span>
+      <span class="debug-value" data-debug-tracking>face: — · hands: — · body: —</span>
+    </div>
+    <div class="debug-hud-row">
+      <span class="debug-label">Gesture</span>
+      <span class="debug-value" data-debug-gesture>—</span>
+    </div>
+    <div class="debug-hud-log" data-debug-log></div>
+  `;
+  document.body.appendChild(wrap);
+
+  // Toggle button (only in debug mode)
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'debug-toggle-btn';
+  toggleBtn.textContent = 'DBG';
+  toggleBtn.title = 'Toggle debug panel (press D) · URL: ?debug=1';
+  document.body.appendChild(toggleBtn);
+
+  let visible = false;
+  function setVisible(v) {
+    visible = v;
+    wrap.classList.toggle('is-visible', v);
+  }
+
+  toggleBtn.addEventListener('click', () => setVisible(!visible));
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'd' || e.key === 'D') {
+      setVisible(!visible);
+    }
+  });
+
+  const fpsEl = wrap.querySelector('[data-debug-fps]');
+  const fpsTargetEl = wrap.querySelector('[data-debug-fps-target]');
+  const fpsSlider = wrap.querySelector('.debug-fps-slider');
+  const trackEl = wrap.querySelector('[data-debug-tracking]');
+  const gestureEl = wrap.querySelector('[data-debug-gesture]');
+  const logEl = wrap.querySelector('[data-debug-log]');
+
+  let targetFPS = 10;
+
+  if (fpsSlider && fpsTargetEl) {
+    fpsSlider.addEventListener('input', () => {
+      targetFPS = parseFloat(fpsSlider.value) || 10;
+      fpsTargetEl.textContent = `${targetFPS.toFixed(0)} fps`;
+    });
+  }
+
+  return {
+    setFPS(fps) {
+      if (!fpsEl) return;
+      if (!fps) {
+        fpsEl.textContent = '—';
+        fpsEl.classList.remove('is-low');
+        return;
+      }
+      fpsEl.textContent = fps.toFixed(1);
+      fpsEl.classList.toggle('is-low', fps < targetFPS);
+    },
+    setTracking(info) {
+      if (!trackEl) return;
+      const face = info?.face ? '✓' : '×';
+      const hands =
+        info?.leftHand || info?.rightHand
+          ? (info.leftHand && info.rightHand ? '✓ (2)' : '✓ (1)')
+          : '×';
+      const body = info?.pose ? '✓' : '×';
+      trackEl.textContent = `face: ${face} · hands: ${hands} · body: ${body}`;
+    },
+    setGesture(text) {
+      if (!gestureEl) return;
+      gestureEl.textContent = text || '—';
+    },
+    log(msg) {
+      if (!logEl || !msg) return;
+      const line = document.createElement('div');
+      line.className = 'debug-log-line';
+      const ts = new Date().toLocaleTimeString();
+      line.textContent = `[${ts}] ${msg}`;
+      logEl.prepend(line);
+      const children = logEl.children;
+      if (children.length > 20) {
+        logEl.removeChild(children[children.length - 1]);
+      }
+    },
+  };
+})();
+
+// Expose to other modules (tracking.js, games)
+window.DebugHUD = DebugHUD;
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) DeviceFeatures.releaseWakeLock();
 });
@@ -874,6 +995,9 @@ function openCameraModal(onCapture) {
   halfCard.addEventListener('click', () => updateMode('half'));
   fullCard.addEventListener('click', () => updateMode('full'));
 
+  let trackingModule = null;
+  let videoWrap = null;
+
   startBtn.addEventListener('click', async () => {
     startBtn.disabled = true;
     startBtn.textContent = '启动中... Starting...';
@@ -888,11 +1012,29 @@ function openCameraModal(onCapture) {
       videoEl.muted = true;
       videoEl.className = 'cam-modal-video';
       videoEl.srcObject = camStream;
-      body.replaceChildren(videoEl, guideOverlay);
+      videoWrap = createElement('div', 'cam-modal-video-wrap');
+      videoWrap.appendChild(videoEl);
+      body.replaceChildren(videoWrap, guideOverlay);
       guideOverlay.style.display = 'flex';
       try { await videoEl.play(); } catch (_) {}
       startBtn.style.display = 'none';
       captureGroup.style.display = 'flex';
+      notice.textContent = selectedMode === 'full'
+        ? '全身模式 — 体脂/体型分析必需 Full body mode — required for body fat & shape analysis'
+        : '半身模式 — 用于生成形象和穿搭识别 Half body mode — for avatar creation & outfit recognition';
+      notice.className = 'cam-modal-notice' + (selectedMode === 'full' ? ' warn' : '');
+      loadTrackingModule().then(async (tk) => {
+        trackingModule = tk;
+        await tk.initModels((msg) => { notice.textContent = msg; });
+        tk.createOverlay(videoWrap);
+        tk.startTracking(videoEl);
+        notice.textContent = selectedMode === 'full'
+          ? '全身模式 · AI 追踪中 Full body mode · AI tracking active'
+          : '半身模式 · AI 追踪中 Half body mode · AI tracking active';
+      }).catch((err) => {
+        console.error('Tracking init in modal:', err);
+        notice.textContent = '摄像头就绪 · AI 追踪未启动 Camera OK · AI tracking not started';
+      });
     } catch (e) {
       notice.textContent = '摄像头失败 Camera failed: ' + (e.message || 'Check permissions');
       notice.className = 'cam-modal-notice warn';
@@ -902,6 +1044,9 @@ function openCameraModal(onCapture) {
   });
 
   function showCaptureResult() {
+    if (trackingModule && typeof trackingModule.stopTracking === 'function') {
+      trackingModule.stopTracking();
+    }
     const snapCanvas = document.createElement('canvas');
     snapCanvas.width = videoEl.videoWidth || 640;
     snapCanvas.height = videoEl.videoHeight || 480;
@@ -988,7 +1133,9 @@ function openCameraModal(onCapture) {
       modeRow.style.display = '';
       notice.style.display = '';
       body.classList.remove('result-mode');
-      body.replaceChildren(videoEl, guideOverlay);
+      videoWrap = createElement('div', 'cam-modal-video-wrap');
+      videoWrap.appendChild(videoEl);
+      body.replaceChildren(videoWrap, guideOverlay);
       guideOverlay.style.display = 'flex';
       footer.innerHTML = '';
       footer.appendChild(cancelBtn);
@@ -997,6 +1144,10 @@ function openCameraModal(onCapture) {
       countdownActive = false;
       cap5Btn.disabled = false;
       cap10Btn.disabled = false;
+      if (trackingModule) {
+        trackingModule.createOverlay(videoWrap);
+        trackingModule.startTracking(videoEl);
+      }
     });
 
     confirmBtn.addEventListener('click', () => {
