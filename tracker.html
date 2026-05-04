@@ -97,6 +97,18 @@
       background: linear-gradient(90deg, #00ffc8, #00ff66);
       border-radius: 2px; transition: width .08s;
     }
+
+    #site-credit {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      font-size: 11px;
+      color: rgba(255,255,255,.35);
+      pointer-events: none;
+      letter-spacing: .02em;
+    }
   </style>
 </head>
 <body>
@@ -123,6 +135,8 @@
       <div class="meter-track"><div class="meter-bar" id="audio-bar"></div></div>
     </div>
   </div>
+
+  <div id="site-credit">作者 · 郭曉玥 · mc569254</div>
 
   <script type="importmap">
     { "imports": { "three": "https://unpkg.com/three@0.162.0/build/three.module.js" } }
