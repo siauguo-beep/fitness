@@ -1,116 +1,139 @@
-# AI 健身体型扫描仪 / AI Fitness Body Scanner
+# AI 健身体型扫描仪 · AI Fitness Body Scanner
 
-基于浏览器的互动体验：结合基础身体数据与摄像头 AI 追踪，可视化当前体态，并模拟目标体重下的体型变化。另有燃脂小游戏与「形象画廊·回忆录」记录进度。
+**中文：** 基于浏览器的互动体验：结合基础身体数据与摄像头 AI 追踪，可视化当前体态，并模拟目标体重下的体型变化；含燃脂小游戏与「形象画廊·回忆录」记录进度。
 
-**在线演示（GitHub Pages）**：[https://siauguo-beep.github.io/fitness/](https://siauguo-beep.github.io/fitness/)
+**English:** A browser-based interactive experience: combine basic body metrics with camera AI tracking to visualize your current silhouette and a simulated target-weight shape; includes fat-burn mini games and an **Avatar Gallery · Memoir** for progress.
 
-**动作追踪独立页**：[https://siauguo-beep.github.io/fitness/tracker.html](https://siauguo-beep.github.io/fitness/tracker.html)
+**在线演示 Live demo (GitHub Pages):** [https://siauguo-beep.github.io/fitness/](https://siauguo-beep.github.io/fitness/)
 
----
-
-## 项目定位与说明
-
-- **体验向演示**，用于展示计算机视觉、3D 可视化与运动交互在健身/ wellness 场景中的可能形态。
-- **非医疗建议**：界面中的 BMI、体脂估算、体态与「未来体型」均为示意与动画效果，不能替代专业体检或教练指导。
+**动作追踪页 Motion tracker:** [https://siauguo-beep.github.io/fitness/tracker.html](https://siauguo-beep.github.io/fitness/tracker.html)
 
 ---
 
-## 技术概要
+## 项目定位与说明 · Project scope & disclaimer
 
-| 类别 | 说明 |
-|------|------|
-| 前端 | 原生 HTML / CSS / JavaScript（模块化） |
-| 3D | [Three.js](https://threejs.org/)（通过 import map 自 CDN 加载） |
-| 视觉 AI | [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision)（面部 / 手部 / 姿态关键点） |
-| 数据持久化 | 回忆录与部分设置使用浏览器 `localStorage` |
+**中文**
 
----
+- **体验向演示**：展示计算机视觉、3D 可视化与运动交互在健身 / wellness 场景中的可能形态。
+- **非医疗建议**：BMI、体脂估算、体态与「未来体型」均为示意与动画效果，不能替代专业体检或教练指导。
 
-## 界面结构（主站 `index.html`）
+**English**
 
-页面自上而下分为 **顶栏** 与 **三栏主体**：
-
-1. **顶栏**
-   - 标题与副标题。
-   - **全屏**：进入/退出全屏，适合手机或演示。
-   - **形象画廊·回忆录**：打开回忆录弹窗（目标、 streak、历史形象截图等）。
-
-2. **左栏 · 基本信息**
-   - **身高 / 当前体重**：滑块调节，用于估算 BMI、体脂等示意指标。
-   - **出生年份**：下拉选择，用于估算年龄。
-   - **性别**：男 / 女。
-   - **活动量**：低 / 中 / 高等档位，影响部分展示逻辑。
-   - **燃脂小游戏**：入口卡片，用于打开「水果切切乐」「拳击训练」「姿态模仿」等互动（需摄像头与手势追踪）。
-
-3. **中栏 · AI 体态扫描**
-   - **启动摄像头** 或 **上传照片**：作为人像来源；随后可进行追踪与形象生成相关流程。
-   - 扫描区域会显示状态（如待机、扫描中）与动态扫描线等视觉反馈。
-   - **今日身体数据卡片**：概括当前体重、目标差距等（与左侧数据联动）。
-   - **形象画廊·回忆录**：与顶栏入口相同，便于在扫描流程中打开。
-
-4. **右栏 · 体型可视化与模拟**
-   - **目标体重**：滑块设定目标，主视图会在「当前」与「目标」体态之间做可视化对比（示意性形变/对比）。
-   - 随窗口尺寸变化会自动重绘布局。
-
-**首次访问**会看到简短 **引导（Onboarding）** 多步介绍，关闭后可通过清除站点数据再次触发。
+- **Experience-first demo:** Showcases how computer vision, 3D visualization, and motion interaction can work in fitness / wellness contexts.
+- **Not medical advice:** BMI, body-fat hints, posture, and “future body” visuals are illustrative animations only—not a substitute for clinical exams or professional coaching.
 
 ---
 
-## 推荐操作流程
+## 技术概要 · Tech stack
 
-1. **填写左侧基本信息**（身高、体重、出生年份、性别、活动量），观察指标与中间统计卡片变化。
-2. **授权摄像头**（或上传照片），完成扫描/形象相关步骤；若浏览器拒绝权限，可改用上传图片或仅使用滑块与右侧模拟功能。
-3. **在右侧调整「目标体重」**，查看当前体态与目标体态的可视化对比。
-4. 需要记录形象或查看进度时，打开 **形象画廊·回忆录**，可配合 **目标体重 / 天数目标** 使用。
-5. 想活动一下时，从左侧进入 **燃脂小游戏**，按各游戏内说明挥动手部或模仿姿势（需摄像头）。
-
----
-
-## `tracker.html`（AI 动作追踪器）
-
-专注 **实时摄像头 + 画布叠加** 的轻量页面：
-
-- 顶部标题 **AI Motion Tracker**。
-- 右侧面板可开关 **面部 / 手部 / 身体** 追踪，并显示简易 **FPS** 与 **麦克风音量条**（用于部分互动或音量反馈场景）。
-- 适合单独全屏调试 MediaPipe 叠加效果，或嵌入其他流程中打开。
+| | 中文 | English |
+|---|------|---------|
+| **前端 Front-end** | 原生 HTML / CSS / JavaScript（模块化） | Vanilla HTML / CSS / JavaScript (ES modules) |
+| **3D** | [Three.js](https://threejs.org/)（import map + CDN） | [Three.js](https://threejs.org/) via import map / CDN |
+| **视觉 AI Vision** | [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision) — 面部 / 手 / 姿态关键点 | [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision) — face / hands / pose landmarks |
+| **存储 Storage** | 回忆录与部分设置使用 `localStorage` | Memoir and some settings use `localStorage` |
 
 ---
 
-## 本地运行
+## 界面结构（`index.html`）· UI layout
 
-静态站点，可用任意本地 HTTP 服务器打开项目根目录（避免 `file://` 下部分 ES 模块限制）：
+**中文**
+
+页面分为 **顶栏** 与 **三栏主体**：
+
+1. **顶栏** — 标题；**全屏**；**形象画廊·回忆录**（目标、 streak、历史截图等）。
+2. **左栏 · 基本信息** — 身高/体重滑块、出生年份、性别、活动量；**燃脂小游戏**入口（水果切切乐、拳击、姿态模仿等，需摄像头）。
+3. **中栏 · AI 体态扫描** — **启动摄像头** / **上传照片**；扫描动画与状态；**今日身体数据卡片**；回忆录入口。
+4. **右栏 · 体型可视化** — **目标体重**滑块：当前 vs 目标体态示意对比；随窗口自动重布局。
+
+首次访问有 **Onboarding** 引导；清除站点数据后可再次看到。
+
+**English**
+
+The page has a **top bar** and a **three-column main area**:
+
+1. **Top bar** — Title; **Fullscreen**; **Avatar Gallery · Memoir** (goals, streak, snapshot history).
+2. **Left · Basic info** — Height/weight sliders, birth year, sex, activity; **mini games** entry (fruit slash, punch trainer, pose mimic—camera required).
+3. **Center · AI body scan** — **Enable camera** / **Upload photo**; scan animation & status; **today’s stats card**; memoir shortcut.
+4. **Right · Visualization** — **Target weight** slider: illustrative current vs target comparison; reflows on resize.
+
+**Onboarding** runs on first visit; clear site data to see it again.
+
+---
+
+## 推荐操作流程 · Suggested workflow
+
+**中文**
+
+1. 在左侧填写 **身高、体重、出生年份、性别、活动量**，观察指标与中栏卡片。
+2. **授权摄像头**或上传照片，完成扫描/形象流程；若拒绝权限，仍可只用滑块与右侧模拟。
+3. 在右侧调整 **目标体重**，查看体态对比。
+4. 打开 **形象画廊·回忆录** 记录形象与进度（目标体重 / 天数）。
+5. 进入 **燃脂小游戏**，按游戏内说明用手势或姿势互动。
+
+**English**
+
+1. Set **height, weight, birth year, sex, activity** on the left; watch metrics and the center card update.
+2. **Allow the camera** or upload a photo for scan/avatar flows; if denied, sliders and right-panel simulation still work.
+3. Adjust **target weight** on the right for the visualization compare.
+4. Open **Avatar Gallery · Memoir** for snapshots and progress (weight goal / day goal).
+5. Launch **mini games** and follow on-screen instructions for hands/pose interaction.
+
+---
+
+## `tracker.html` · AI Motion Tracker
+
+**中文** — 轻量 **摄像头 + 画布叠加** 页：标题 **AI Motion Tracker**；右侧开关 **面/手/身** 追踪、**FPS**、**麦克风电平**；适合单独调试叠加或嵌入流程。
+
+**English** — Lightweight **camera + canvas overlay** page: **AI Motion Tracker** title; toggles for **face/hands/pose**, **FPS**, and **mic level**; good for debugging overlays or opening from another flow.
+
+---
+
+## 本地运行 · Local development
+
+**中文** — 用 HTTP 服务打开项目根目录（避免 `file://` 下 ES 模块限制）：
+
+**English** — Serve the repo root over HTTP (ES modules may not load from `file://`):
 
 ```bash
 cd fitness
 python3 -m http.server 8765
 ```
 
-浏览器访问：`http://127.0.0.1:8765/`
+浏览器 / Open: `http://127.0.0.1:8765/`
 
-### 关于 AI 模型文件
+### AI 模型文件 · Model files
 
-仓库的 `.gitignore` 默认忽略 `models/*.task`。若需 **完整的本地/离线摄像头关键点检测**，请将 MediaPipe 的下列任务模型放到 `models/` 目录（文件名需与 `tracking.js` 中配置一致），例如：
+**中文** — `.gitignore` 忽略 `models/*.task`。完整离线关键点检测需将 MediaPipe 任务模型放入 `models/`，文件名与 `tracking.js` 一致：
+
+**English** — `.gitignore` excludes `models/*.task`. For full local landmark detection, place MediaPipe task models under `models/` with the names expected by `tracking.js`:
 
 - `face_landmarker.task`
 - `hand_landmarker.task`
 - `pose_landmarker_lite.task`
 
-未放置模型时，与实时关键点相关的功能可能无法启动或会回退报错，**不影响**纯表单与部分不涉及模型的界面浏览。
+**中文** — 无模型时实时追踪可能不可用；纯表单与部分界面仍可浏览。
+
+**English** — Without models, live tracking may fail; forms and some UI still work.
 
 ---
 
-## 部署（GitHub Pages）
+## 部署 · Deploy (GitHub Pages)
 
-本仓库已配置 **GitHub Actions** 发布静态站点。在仓库 **Settings → Pages** 中将 **Source** 设为 **GitHub Actions** 后，推送到 `main` 分支将触发工作流 **Deploy GitHub Pages**。部署完成后即可通过上文在线地址访问。
+**中文** — 已配置 **GitHub Actions**。在仓库 **Settings → Pages** 将 **Source** 设为 **GitHub Actions**，推送 `main` 将触发 **Deploy GitHub Pages**。
 
----
-
-## 作者
-
-**郭曉玥**（`mc569254`）
+**English** — **GitHub Actions** is configured. Set **Settings → Pages → Source** to **GitHub Actions**; pushes to `main` trigger **Deploy GitHub Pages**.
 
 ---
 
-## 许可与声明
+## 作者 · Author
 
-体验内容仅供学习与演示；使用摄像头与麦克风时请遵守当地法规与隐私规范，勿在未经同意的情况下拍摄他人。
+**郭曉玥 · Guo Xiaoyue**（`mc569254`）
+
+---
+
+## 许可与声明 · Legal & privacy note
+
+**中文** — 仅供学习与演示。使用摄像头/麦克风须遵守法规与隐私，勿未经同意拍摄他人。
+
+**English** — For learning and demonstration only. Follow local laws and privacy norms for camera/microphone use; do not record others without consent.
